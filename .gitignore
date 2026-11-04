@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Environment files
+.env
+.env*.local
+
+# Database & Storage
+data/
+*.db
+*.sqlite
+storage/audio/*
+!storage/audio/.gitkeep
+storage/artwork/*
+!storage/artwork/.gitkeep
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+
