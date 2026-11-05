@@ -220,13 +220,13 @@ CREATE POLICY "Public Audio Stream Access" ON storage.objects
 -- -----------------------------------------------------------------------------
 -- 4. Initial Seed Data (Demo Audiophile Member & Master Recordings)
 -- -----------------------------------------------------------------------------
--- Demo user: audiophile / password123 (bcrypt hash: $2b$12$609t2uL2iJ6N7e0rB8sJYe3bHwK9Z9HkQz.1l1XGZ5B4Y6bV.8b.m)
+-- Demo user: audiophile / password123
 INSERT INTO users (id, email, username, hashed_password, display_name, role)
 VALUES (
     'a0000000-0000-0000-0000-000000000001',
     'audiophile@neiro.internal',
     'audiophile',
-    '$2b$12$LhWk20B6rZqG83N.lSJE6eT99.g81oQYqfCcvYc1vV3a6a9/X5u/y',
+    '$2b$12$R4HUSmodmtwgpZffyhSvpeNPq4cqOfA5B6Rl//Onr1h0JXM1wcBCC',
     'Neiro Listener',
     'audiophile_member'
 ) ON CONFLICT (email) DO NOTHING;

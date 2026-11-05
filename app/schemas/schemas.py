@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, AliasChoices
 
 # ------------------------------------------------------------------------------
 # Auth & User Schemas
@@ -9,10 +9,13 @@ class RegisterRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=255)
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=6)
-    displayName: Optional[str] = None
+    displayName: Optional[str] = Field(None, validation_alias=AliasChoices("displayName", "display_name", "name"))
 
 class LoginRequest(BaseModel):
-    username_or_email: str
+    username_or_email: str = Field(
+        ...,
+        validation_alias=AliasChoices("username_or_email", "usernameOrEmail", "username", "email")
+    )
     password: str
 
 class UserResponse(BaseModel):

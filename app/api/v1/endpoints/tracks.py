@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from ....core.database import get_db
 from ....core.config import settings
@@ -100,7 +100,17 @@ def stream_track(
 
     file_path = StorageService.get_audio_path(track.file_path)
     if not file_path:
-        raise HTTPException(status_code=404, detail="Physical audio file not found on disk")
+        # 1. Direct external / CDN URL
+        if track.file_path and (track.file_path.startswith("http://") or track.file_path.startswith("https://")):
+            return RedirectResponse(url=track.file_path, status_code=307)
+
+        # 2. Supabase Storage CDN public bucket URL fallback
+        if settings.STORAGE_PROVIDER == "supabase" and settings.SUPABASE_URL:
+            filename = os.path.basename(track.file_path)
+            public_url = f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{settings.SUPABASE_BUCKET_AUDIO}/{filename}"
+            return RedirectResponse(url=public_url, status_code=307)
+
+        raise HTTPException(status_code=404, detail="Audio file not found on local disk or cloud bucket")
 
     return stream_audio_file(file_path, track.codec, request)
 
@@ -108,6 +118,9 @@ def stream_track(
 def get_artwork(filename: str):
     artwork_path = os.path.join(settings.ARTWORK_DIR, filename)
     if not os.path.exists(artwork_path):
+        if settings.STORAGE_PROVIDER == "supabase" and settings.SUPABASE_URL:
+            public_url = f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{settings.SUPABASE_BUCKET_ARTWORK}/{filename}"
+            return RedirectResponse(url=public_url, status_code=307)
         raise HTTPException(status_code=404, detail="Artwork not found")
     return FileResponse(artwork_path)
 

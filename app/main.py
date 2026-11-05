@@ -35,23 +35,34 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Configuration (Production & Development support)
+# CORS Configuration (Production & Development support for third-party consumers)
 cors_origins = settings.cors_origins_list
+cors_kwargs = {
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+    "expose_headers": [
+        "Content-Range",
+        "Accept-Ranges",
+        "Content-Length",
+        "Content-Type",
+        "Content-Disposition",
+        "X-Audio-Bit-Depth",
+        "X-Audio-Sample-Rate",
+    ],
+}
+
 if "*" in cors_origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"^https?://.*",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        **cors_kwargs,
     )
 else:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        **cors_kwargs,
     )
 
 # Include API v1 Router
