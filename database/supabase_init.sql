@@ -148,6 +148,57 @@ CREATE TABLE IF NOT EXISTS listening_history (
 
 CREATE INDEX IF NOT EXISTS idx_history_user_date ON listening_history(user_id, listened_at DESC);
 
+-- Devices Table (Active streaming clients)
+CREATE TABLE IF NOT EXISTS devices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    device_name VARCHAR(255) NOT NULL,
+    device_type VARCHAR(50) DEFAULT 'web',
+    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Playback Sessions Table (Real-time synchronization across devices)
+CREATE TABLE IF NOT EXISTS playback_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    device_id VARCHAR(100) NOT NULL,
+    track_id UUID REFERENCES tracks(id) ON DELETE CASCADE,
+    position_seconds REAL DEFAULT 0.0,
+    is_playing BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Licenses Table
+CREATE TABLE IF NOT EXISTS licenses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    track_id UUID REFERENCES tracks(id) ON DELETE CASCADE,
+    license_type VARCHAR(100) DEFAULT 'personal_locker',
+    rights_holder VARCHAR(255),
+    territory VARCHAR(100) DEFAULT 'worldwide',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Preferences Table
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    preferred_quality VARCHAR(50) DEFAULT 'lossless',
+    equalizer_preset VARCHAR(50) DEFAULT 'flat',
+    dark_mode BOOLEAN DEFAULT TRUE,
+    crossfade_seconds REAL DEFAULT 0.0
+);
+
+-- Uploads Table (Tracking processing pipeline)
+CREATE TABLE IF NOT EXISTS uploads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    original_filename VARCHAR(255) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- -----------------------------------------------------------------------------
 -- 3. Supabase Storage Buckets Provisioning
 -- -----------------------------------------------------------------------------

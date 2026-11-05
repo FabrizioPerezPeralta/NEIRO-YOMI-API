@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, Uuid
 from sqlalchemy.orm import relationship
 from ..core.database import Base
 
@@ -10,10 +10,14 @@ def generate_uuid() -> str:
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
+# Cross-database GUID type: compiles to UUID in PostgreSQL/Supabase and CHAR(32)/String in SQLite.
+# as_uuid=False ensures Python receives and passes standard UUID string representations.
+GUID = Uuid(as_uuid=False)
+
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
@@ -32,7 +36,7 @@ class User(Base):
 class Artist(Base):
     __tablename__ = "artists"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
     name = Column(String(255), index=True, nullable=False)
     biography = Column(Text, nullable=True)
     image_url = Column(String(500), nullable=True)
@@ -47,9 +51,9 @@ class Artist(Base):
 class Album(Base):
     __tablename__ = "albums"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
     title = Column(String(255), index=True, nullable=False)
-    artist_id = Column(String(36), ForeignKey("artists.id"), nullable=False)
+    artist_id = Column(GUID, ForeignKey("artists.id"), nullable=False)
     cover_art_url = Column(String(500), nullable=True)
     release_date = Column(String(50), nullable=True)
     year = Column(Integer, nullable=True)
@@ -65,10 +69,10 @@ class Album(Base):
 class Track(Base):
     __tablename__ = "tracks"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
     title = Column(String(255), index=True, nullable=False)
-    artist_id = Column(String(36), ForeignKey("artists.id"), nullable=False)
-    album_id = Column(String(36), ForeignKey("albums.id"), nullable=True)
+    artist_id = Column(GUID, ForeignKey("artists.id"), nullable=False)
+    album_id = Column(GUID, ForeignKey("albums.id"), nullable=True)
     duration_seconds = Column(Float, nullable=False, default=0.0)
     track_number = Column(Integer, nullable=True)
     disc_number = Column(Integer, default=1)
@@ -85,7 +89,7 @@ class Track(Base):
     file_path = Column(String(500), nullable=False)
     checksum_sha256 = Column(String(64), nullable=True)
     cover_art_url = Column(String(500), nullable=True)
-    uploaded_by = Column(String(36), ForeignKey("users.id"), nullable=True)
+    uploaded_by = Column(GUID, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
     artist = relationship("Artist", back_populates="tracks")
@@ -98,8 +102,8 @@ class Track(Base):
 class AudioAsset(Base):
     __tablename__ = "audio_assets"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    track_id = Column(String(36), ForeignKey("tracks.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    track_id = Column(GUID, ForeignKey("tracks.id"), nullable=False)
     storage_key = Column(String(500), nullable=False)
     file_size_bytes = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
@@ -112,11 +116,11 @@ class AudioAsset(Base):
 class Playlist(Base):
     __tablename__ = "playlists"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
     title = Column(String(255), index=True, nullable=False)
     description = Column(Text, nullable=True)
     cover_art_url = Column(String(500), nullable=True)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    user_id = Column(GUID, ForeignKey("users.id"), nullable=False)
     is_public = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
@@ -127,9 +131,9 @@ class Playlist(Base):
 class PlaylistTrack(Base):
     __tablename__ = "playlist_tracks"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    playlist_id = Column(String(36), ForeignKey("playlists.id"), nullable=False)
-    track_id = Column(String(36), ForeignKey("tracks.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    playlist_id = Column(GUID, ForeignKey("playlists.id"), nullable=False)
+    track_id = Column(GUID, ForeignKey("tracks.id"), nullable=False)
     position = Column(Integer, default=0)
     added_at = Column(DateTime, default=utc_now)
 
@@ -139,9 +143,9 @@ class PlaylistTrack(Base):
 class Favorite(Base):
     __tablename__ = "favorites"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    track_id = Column(String(36), ForeignKey("tracks.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    user_id = Column(GUID, ForeignKey("users.id"), nullable=False)
+    track_id = Column(GUID, ForeignKey("tracks.id"), nullable=False)
     created_at = Column(DateTime, default=utc_now)
 
     user = relationship("User", back_populates="favorites")
@@ -150,9 +154,9 @@ class Favorite(Base):
 class ListeningHistory(Base):
     __tablename__ = "listening_history"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    track_id = Column(String(36), ForeignKey("tracks.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    user_id = Column(GUID, ForeignKey("users.id"), nullable=False)
+    track_id = Column(GUID, ForeignKey("tracks.id"), nullable=False)
     played_at = Column(DateTime, default=utc_now)
     completion_ratio = Column(Float, default=1.0) # 0.0 - 1.0
 
@@ -162,8 +166,8 @@ class ListeningHistory(Base):
 class Device(Base):
     __tablename__ = "devices"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    user_id = Column(GUID, ForeignKey("users.id"), nullable=False)
     device_name = Column(String(255), nullable=False)
     device_type = Column(String(50), default="web") # web, desktop, mobile
     last_active_at = Column(DateTime, default=utc_now)
@@ -173,10 +177,10 @@ class Device(Base):
 class PlaybackSession(Base):
     __tablename__ = "playback_sessions"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    user_id = Column(GUID, ForeignKey("users.id"), nullable=False)
     device_id = Column(String(100), nullable=False)
-    track_id = Column(String(36), ForeignKey("tracks.id"), nullable=False)
+    track_id = Column(GUID, ForeignKey("tracks.id"), nullable=False)
     position_seconds = Column(Float, default=0.0)
     is_playing = Column(Boolean, default=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
@@ -187,8 +191,8 @@ class PlaybackSession(Base):
 class License(Base):
     __tablename__ = "licenses"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    track_id = Column(String(36), ForeignKey("tracks.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    track_id = Column(GUID, ForeignKey("tracks.id"), nullable=False)
     license_type = Column(String(100), default="personal_locker") # personal_locker, creative_commons, direct_artist, public_domain
     rights_holder = Column(String(255), nullable=True)
     territory = Column(String(100), default="worldwide")
@@ -200,8 +204,8 @@ class License(Base):
 class UserPreference(Base):
     __tablename__ = "user_preferences"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    user_id = Column(String(36), ForeignKey("users.id"), unique=True, nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    user_id = Column(GUID, ForeignKey("users.id"), unique=True, nullable=False)
     preferred_quality = Column(String(50), default="lossless") # standard, high_quality, lossless, hi_res
     equalizer_preset = Column(String(50), default="flat")
     dark_mode = Column(Boolean, default=True)
@@ -212,12 +216,11 @@ class UserPreference(Base):
 class Upload(Base):
     __tablename__ = "uploads"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    id = Column(GUID, primary_key=True, default=generate_uuid)
+    user_id = Column(GUID, ForeignKey("users.id"), nullable=False)
     original_filename = Column(String(255), nullable=False)
     status = Column(String(50), default="pending") # pending, processing, completed, failed
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
     user = relationship("User")
-
