@@ -48,7 +48,7 @@ class Settings(BaseSettings):
                 pass
         return [i.strip() for i in val.split(",") if i.strip()]
 
-    model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="allow")
+    model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
 settings = Settings()
 
