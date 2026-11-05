@@ -174,6 +174,208 @@ Todos los endpoints están documentados interactivamente mediante **Swagger UI**
 
 ---
 
+## 🌐 Cómo Consumir e Integrar esta API en Otros Proyectos
+
+Esta API fue diseñada como un **motor de streaming y catálogo agnóstico e interoperable**. Cualquier desarrollador o aplicación externa (sitios web de terceros, aplicaciones móviles en Flutter/React Native/Swift/Kotlin, bots de Discord/Telegram, clientes de escritorio o scripts de automatización) puede integrarse y consumir sus servicios.
+
+### 1. Requisitos Previos y URL Base
+
+- **URL Base en Desarrollo:** `http://localhost:8000`
+- **URL Base en Producción:** `https://tu-api.up.railway.app` (o el dominio asignado en tu hosting)
+- **Documentación Interactiva:** Visita `/docs` (Swagger) o `/redoc` para probar peticiones en vivo y ver los contratos JSON exactos.
+
+#### Política de CORS (Cross-Origin Resource Sharing)
+Para que aplicaciones web alojadas en otros dominios (ej. `https://mi-otra-app.com`, `http://localhost:3000`) puedan consumir la API sin bloqueos de seguridad en el navegador:
+- Configura en el archivo `.env` de la API:
+  ```env
+  CORS_ORIGINS=*
+  ```
+  *(O especifica los dominios separados por coma: `https://mi-app.com,https://dashboard.externo.com`)*.
+
+---
+
+### 2. Flujo de Autenticación (Bearer JWT)
+
+Los endpoints de catálogo público, búsqueda y streaming pueden consumirse libremente, mientras que funciones de biblioteca personal (favoritos, creación de playlists, perfil) requieren autenticación por token.
+
+1. **Obtener el Token (`POST /api/v1/auth/login`):**
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"username_or_email": "usuario", "password": "tu_password"}'
+   ```
+   **Respuesta JSON:**
+   ```json
+   {
+     "user": {
+       "id": "a0000000-0000-0000-0000-000000000001",
+       "email": "usuario@ejemplo.com",
+       "username": "usuario",
+       "displayName": "Usuario",
+       "role": "user",
+       "avatarUrl": null,
+       "createdAt": "2026-11-05T12:00:00Z"
+     },
+     "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+     "tokenType": "bearer"
+   }
+   ```
+
+2. **Enviar el Token en peticiones protegidas:**
+   Incluye la cabecera HTTP estándar en cada petición subsecuente:
+   ```http
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIsIn...
+   ```
+
+---
+
+### 3. Reproducción de Audio en Clientes Externos (HTML5 / Móvil)
+
+El endpoint de streaming soporta **HTTP Range Requests** (`206 Partial Content`). Esto permite que los reproductores nativos reproduzcan instantáneamente sin esperar a que el archivo descargue por completo, y soporta rebobinado fluido (*seek*).
+
+#### En HTML5 / React / Vue:
+```html
+<audio controls preload="metadata">
+  <source src="https://tu-api.up.railway.app/api/v1/tracks/{TRACK_ID}/stream" type="audio/flac">
+  Tu navegador no soporta el elemento de audio.
+</audio>
+```
+
+---
+
+### 4. Ejemplos de Integración por Lenguaje / Framework
+
+#### A. JavaScript / TypeScript (Fetch API / React / Next.js / Node.js)
+
+```typescript
+// neiro-client.ts
+const API_BASE_URL = "https://tu-api.up.railway.app";
+
+// 1. Obtener catálogo de pistas Master
+export async function getTracks() {
+  const response = await fetch(`${API_BASE_URL}/api/v1/tracks`);
+  if (!response.ok) throw new Error("Error obteniendo catálogo");
+  return await response.json();
+}
+
+// 2. Búsqueda federada (Colección local + YouTube Music)
+export async function searchMusic(query: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/search?q=${encodeURIComponent(query)}`);
+  return await response.json();
+}
+
+// 3. Obtener URL directa de streaming para un reproductor de audio
+export function getStreamUrl(trackId: string): string {
+  return `${API_BASE_URL}/api/v1/tracks/${trackId}/stream`;
+}
+
+// 4. Petición autenticada (ej. listar favoritos del usuario)
+export async function getFavorites(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/favorites`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/json"
+    }
+  });
+  return await response.json();
+}
+```
+
+#### B. Python (Scripts, Automatizaciones o Bots de Discord/Telegram)
+
+```python
+import requests
+
+API_BASE = "https://tu-api.up.railway.app"
+
+# 1. Iniciar sesión y obtener token
+login_res = requests.post(
+    f"{API_BASE}/api/v1/auth/login",
+    json={"username_or_email": "audiophile", "password": "password123"}
+)
+token = login_res.json()["accessToken"]
+headers = {"Authorization": f"Bearer {token}"}
+
+# 2. Consultar pistas en alta resolución (Hi-Res)
+tracks_res = requests.get(f"{API_BASE}/api/v1/tracks")
+tracks = tracks_res.json()
+
+for track in tracks:
+    print(f"🎵 {track['title']} - {track['codec'].upper()} {track['sampleRate']}Hz/{track['bitDepth']}bit")
+
+# 3. URL de streaming lista para VLC, pygame, discord.py o ffmpeg
+stream_url = f"{API_BASE}/api/v1/tracks/{tracks[0]['id']}/stream"
+print("Stream URL:", stream_url)
+```
+
+#### C. Dart / Flutter (Aplicaciones Móviles Android / iOS)
+
+```dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:just_audio/just_audio.dart'; // O audioplayers
+
+class NeiroApiClient {
+  static const String baseUrl = 'https://tu-api.up.railway.app';
+
+  // Obtener catálogo de canciones
+  static Future<List<dynamic>> fetchTracks() async {
+    final response = await http.get(Uri.parse('$baseUrl/api/v1/tracks'));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Error al cargar canciones');
+  }
+
+  // Reproducir pista directamente en just_audio
+  static Future<void> playTrack(AudioPlayer player, String trackId) async {
+    final streamUrl = '$baseUrl/api/v1/tracks/$trackId/stream';
+    await player.setUrl(streamUrl);
+    player.play();
+  }
+}
+```
+
+#### D. cURL / Terminal / Scripts de Bash
+
+```bash
+# 1. Comprobar salud del servicio
+curl -s http://localhost:8000/health
+
+# 2. Búsqueda de canciones
+curl -s "http://localhost:8000/api/v1/search?q=ambient" | jq .
+
+# 3. Inspeccionar streaming por rangos (debe devolver HTTP 206 Partial Content)
+curl -I -r 0-1024 "http://localhost:8000/api/v1/tracks/{TRACK_ID}/stream"
+```
+
+---
+
+### 5. Códigos de Respuesta y Manejo de Errores
+
+La API utiliza códigos de estado HTTP estándar y respuestas JSON con la propiedad `detail`:
+
+| Código | Significado | Explicación |
+| :--- | :--- | :--- |
+| `200 OK` | Petición exitosa | Devuelve el recurso solicitado en formato JSON. |
+| `201 Created` | Recurso creado | Registro o creación de playlist/favorito completado. |
+| `206 Partial Content` | Streaming por rangos | Se transmite el fragmento de audio solicitado (`Range: bytes=x-y`). |
+| `400 Bad Request` | Parámetros inválidos | La petición carece de campos obligatorios o formato erróneo. |
+| `401 Unauthorized` | No autenticado | Token ausente, vencido o credenciales inválidas. |
+| `403 Forbidden` | Prohibido | No tienes permisos suficientes para realizar esta acción. |
+| `404 Not Found` | No encontrado | La pista, artista, álbum o recurso solicitado no existe. |
+| `422 Unprocessable Entity`| Error de validación | El cuerpo JSON no cumple con el esquema requerido por Pydantic. |
+| `500 Internal Error` | Error de servidor | Fallo interno en la base de datos o el motor de procesamiento. |
+
+Ejemplo de respuesta de error:
+```json
+{
+  "detail": "Pista no encontrada o archivo de audio inaccesible"
+}
+```
+
+---
+
 ## 🚀 Despliegue en Producción
 
 ### Opción 1: Railway (Recomendada)
