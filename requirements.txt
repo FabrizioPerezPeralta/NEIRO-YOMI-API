@@ -5,6 +5,7 @@ pydantic-settings>=2.2.0
 sqlalchemy>=2.0.28
 alembic>=1.13.1
 psycopg2-binary>=2.9.9
+psycopg[binary]>=3.1.18
 asyncpg>=0.29.0
 aiosqlite>=0.20.0
 bcrypt>=4.1.2
