@@ -206,40 +206,34 @@ class SpotubeService:
 
         url = f"https://www.youtube.com/watch?v={video_id}"
 
-        # Try mobile/iOS clients to avoid datacenter IP bot detection
-        client_configs = [
-            {"player_client": ["ios", "android", "mweb"]},
-            {"player_client": ["android"]},
-            {"player_client": ["ios"]},
-            {"player_client": ["mweb", "web"]}
-        ]
-
-        for client_cfg in client_configs:
-            ydl_opts = {
-                "format": "bestaudio[ext=m4a]/bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "extract_flat": False,
-                "extractor_args": {
-                    "youtube": client_cfg
+        ydl_opts = {
+            "format": "bestaudio[ext=m4a]/bestaudio/best",
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+            "socket_timeout": 8,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "ios"]
                 }
             }
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    stream_url = info.get("url")
-                    if stream_url:
-                        headers = info.get("http_headers", {})
-                        data = {
-                            "url": stream_url,
-                            "timestamp": now,
-                            "codec": info.get("acodec", "opus"),
-                            "headers": headers
-                        }
-                        cls._stream_cache[video_id] = data
-                        return data
-            except Exception as e:
-                print(f"[SpotubeService Stream Error for {video_id} with client {client_cfg}] {e}")
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                stream_url = info.get("url")
+                if stream_url:
+                    headers = info.get("http_headers", {})
+                    data = {
+                        "url": stream_url,
+                        "timestamp": now,
+                        "codec": info.get("acodec", "opus"),
+                        "headers": headers
+                    }
+                    cls._stream_cache[video_id] = data
+                    return data
+        except Exception as e:
+            print(f"[SpotubeService Stream Error for {video_id}] {e}")
 
         return None
 

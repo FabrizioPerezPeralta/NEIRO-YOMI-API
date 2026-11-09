@@ -392,56 +392,16 @@ def online_save(
     }
 
 @router.get("/online-stream/{video_id}")
-def online_stream(video_id: str, request: Request):
+def online_stream(video_id: str):
     """
-    Streams audio from YouTube Music / Spotube with full Range request support
-    and CORS enabled for Web Audio API DSP 10-band EQ and FFT Visualizer.
+    Streams audio from YouTube Music / Spotube by redirecting directly
+    to the high-speed CDN audio stream with 307 Temporary Redirect.
     """
-    import requests
-    from fastapi.responses import StreamingResponse, RedirectResponse
+    from fastapi.responses import RedirectResponse
     from ....services.spotube_service import SpotubeService
 
     stream_data = SpotubeService.get_audio_stream_data(video_id)
     if not stream_data or not stream_data.get("url"):
         raise HTTPException(status_code=404, detail="Could not resolve online audio stream for track")
 
-    stream_url = stream_data["url"]
-    upstream_headers = stream_data.get("headers", {})
-
-    # Forward Range header from client
-    req_headers = {**upstream_headers}
-    range_header = request.headers.get("range")
-    if range_header:
-        req_headers["Range"] = range_header
-
-    try:
-        upstream = requests.get(stream_url, headers=req_headers, stream=True, timeout=15)
-        status_code = upstream.status_code
-
-        if status_code >= 400:
-            return RedirectResponse(url=stream_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-
-        content_type = upstream.headers.get("Content-Type", "audio/mp4")
-        res_headers = {
-            "Content-Type": content_type,
-            "Accept-Ranges": "bytes",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "Range",
-        }
-        for h in ["Content-Range", "Content-Length"]:
-            if h in upstream.headers:
-                res_headers[h] = upstream.headers[h]
-
-        def iter_chunks():
-            try:
-                for chunk in upstream.iter_content(chunk_size=65536):
-                    if chunk:
-                        yield chunk
-            finally:
-                upstream.close()
-
-        return StreamingResponse(iter_chunks(), status_code=status_code, headers=res_headers)
-    except Exception as e:
-        # Fallback to direct redirect
-        return RedirectResponse(url=stream_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    return RedirectResponse(url=stream_data["url"], status_code=status.HTTP_307_TEMPORARY_REDIRECT)
