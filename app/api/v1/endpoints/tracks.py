@@ -401,22 +401,29 @@ def online_stream(video_id: str, request: Request):
     from fastapi.responses import StreamingResponse, RedirectResponse
     from ....services.spotube_service import SpotubeService
 
-    stream_url = SpotubeService.get_audio_stream_url(video_id)
-    if not stream_url:
+    stream_data = SpotubeService.get_audio_stream_data(video_id)
+    if not stream_data or not stream_data.get("url"):
         raise HTTPException(status_code=404, detail="Could not resolve online audio stream for track")
 
-    # Proxy streaming with Range support for Web Audio API without CORS restrictions
-    req_headers = {}
+    stream_url = stream_data["url"]
+    upstream_headers = stream_data.get("headers", {})
+
+    # Forward Range header from client
+    req_headers = {**upstream_headers}
     range_header = request.headers.get("range")
     if range_header:
         req_headers["Range"] = range_header
 
     try:
-        upstream = requests.get(stream_url, headers=req_headers, stream=True, timeout=12)
+        upstream = requests.get(stream_url, headers=req_headers, stream=True, timeout=15)
         status_code = upstream.status_code
 
+        if status_code >= 400:
+            return RedirectResponse(url=stream_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+        content_type = upstream.headers.get("Content-Type", "audio/mp4")
         res_headers = {
-            "Content-Type": upstream.headers.get("Content-Type", "audio/webm"),
+            "Content-Type": content_type,
             "Accept-Ranges": "bytes",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",

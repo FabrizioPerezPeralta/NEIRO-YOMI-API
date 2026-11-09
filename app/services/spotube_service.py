@@ -177,41 +177,76 @@ class SpotubeService:
         return tracks
 
     @classmethod
-    def get_audio_stream_url(cls, video_id: str) -> Optional[str]:
+    def get_audio_stream_data(cls, video_id: str) -> Optional[Dict[str, Any]]:
         now = time.time()
         # In-memory cache valid for 1 hour
         if video_id in cls._stream_cache:
             cached = cls._stream_cache[video_id]
             if now - cached["timestamp"] < 3600:
-                return cached["url"]
+                return cached
 
         # Jamendo direct audio URL
         if video_id.startswith("jam_"):
+            try:
+                from .jamendo import JamendoCatalogService
+                jam_id = video_id.replace("jam_", "")
+                tracks = JamendoCatalogService.fetch_tracks(limit=1, search_query=jam_id)
+                if tracks and tracks[0].get("audio"):
+                    data = {
+                        "url": tracks[0]["audio"],
+                        "timestamp": now,
+                        "codec": "mp3",
+                        "headers": {}
+                    }
+                    cls._stream_cache[video_id] = data
+                    return data
+            except Exception as e:
+                print(f"[Jamendo stream resolve error] {e}")
             return None
 
         url = f"https://www.youtube.com/watch?v={video_id}"
-        ydl_opts = {
-            "format": "bestaudio[ext=m4a]/bestaudio/best",
-            "quiet": True,
-            "no_warnings": True,
-            "extract_flat": False,
-        }
 
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                stream_url = info.get("url")
-                if stream_url:
-                    cls._stream_cache[video_id] = {
-                        "url": stream_url,
-                        "timestamp": now,
-                        "codec": info.get("acodec", "opus")
-                    }
-                    return stream_url
-        except Exception as e:
-            print(f"[SpotubeService Stream Error for {video_id}] {e}")
+        # Try mobile/iOS clients to avoid datacenter IP bot detection
+        client_configs = [
+            {"player_client": ["ios", "android", "mweb"]},
+            {"player_client": ["android"]},
+            {"player_client": ["ios"]},
+            {"player_client": ["mweb", "web"]}
+        ]
+
+        for client_cfg in client_configs:
+            ydl_opts = {
+                "format": "bestaudio[ext=m4a]/bestaudio/best",
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": False,
+                "extractor_args": {
+                    "youtube": client_cfg
+                }
+            }
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    stream_url = info.get("url")
+                    if stream_url:
+                        headers = info.get("http_headers", {})
+                        data = {
+                            "url": stream_url,
+                            "timestamp": now,
+                            "codec": info.get("acodec", "opus"),
+                            "headers": headers
+                        }
+                        cls._stream_cache[video_id] = data
+                        return data
+            except Exception as e:
+                print(f"[SpotubeService Stream Error for {video_id} with client {client_cfg}] {e}")
 
         return None
+
+    @classmethod
+    def get_audio_stream_url(cls, video_id: str) -> Optional[str]:
+        data = cls.get_audio_stream_data(video_id)
+        return data.get("url") if data else None
 
     @classmethod
     def get_trending(cls, limit: int = 15) -> List[Dict[str, Any]]:
@@ -250,6 +285,11 @@ class SpotubeService:
             "quiet": True,
             "no_warnings": True,
             "writethumbnail": False,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "android", "mweb"]
+                }
+            }
         }
 
         try:
